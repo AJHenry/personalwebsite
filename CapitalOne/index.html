@@ -1,0 +1,370 @@
+<!DOCTYPE HTML>
+<!--
+   Template: Multiverse by HTML5 UP
+   html5up.net | @ajlkn
+   Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+   Heavily Edited by Andrew Henry
+   imandrewh@outlook.com
+   https://github.com/AJHenry/eateasy
+   -->
+<html>
+   <head>
+      <title>Eat Easy</title>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+      <link rel="stylesheet" href="assets/css/main.css" />
+   </head>
+   <body>
+      <!-- Wrapper -->
+      <div id="wrapper">
+         <!-- Search -->
+         <div id="searchArea">
+            <form>
+               <fieldset>
+                  <div class="search">
+                     <div id="term">
+                        <input type="search" id="terminput" placeholder="Terms you want to search"/>
+                     </div>
+                     <div id="price">
+                        <select name="Price" id="Price" onchange="sendSuggestion();">
+                           <option value="2" selected="selected" disabled style="display:none;">Price</option>
+                           <option value="1">$</option>
+                           <option value="2">$$</option>
+                           <option value="3">$$$</option>
+                           <option value="4">$$$$</option>
+                        </select>
+                     </div>
+                     <div id="location">	
+                        <input type="search" id="inputloc" placeholder="Location"/>
+                     </div>
+                     <div id="distance">
+                        <select name="Distance" id="Distance" onchange="sendSuggestion();">
+                           <option value="10" selected="selected" style="display:none;">Distance</option>
+                           <option value="5">5 Miles</option>
+                           <option value="10">10 Miles</option>
+                           <option value="15">15 Miles</option>
+                           <option value="25">25 Miles</option>
+                        </select>
+                     </div>
+                     <div id="delivery">
+                        <select name="open" id="open" onchange="sendSuggestion();">
+                           <option value="false" selected="selected" style="display:none;">Open Now</option>
+                           <option value="false">No Preference</option>
+                           <option value="true">Yes</option>
+                        </select>
+                     </div>
+                     <div id="sort">
+                        <select name="Sort" id="Sort" onchange="sendSuggestion();">
+                           <option value="best_match" selected="selected" style="display:none;">Sort By</option>
+                           <option value="best_match">Best Match</option>
+                           <option value="distance">Distance</option>
+                           <option value="rating">Rating</option>
+                        </select>
+                     </div>
+                  </div>
+               </fieldset>
+            </form>
+         </div>
+		 <div id="loading">
+			<span id="loadingtext">Loading...</span>
+		</div>
+         <!-- Main -->
+         <div id="main">
+         </div>
+      </div>
+	  <!-- Landing page -->
+      <div id="landing">
+         <div id="first">
+            <h1>Welcome</h1>
+            <form>
+               <fieldset>
+                  <div>
+                     <input type="search" id="landingterm" placeholder="What are you in the mood for? Mexican? Starbucks?"/>
+                  </div>
+               </fieldset>
+            </form>
+            <h3 onclick="css()">
+               or continue to see what's popular around you
+            </h3>
+         </div>
+      </div>
+	  <!-- Scripts -->
+      <script src="assets/js/jquery.min.js"></script>
+      <script src="assets/js/skel.min.js"></script>
+      <script src="assets/js/util.js"></script>
+      <script src="assets/js/main.js"></script>
+   </body>
+<script type="text/javascript">
+var city;
+var state;
+var add;
+var number = 10; //default of 10 options show
+var offset = number;
+var price;
+var delivery;
+var distance;
+var sort;
+var term;
+var moreResults = true;
+function css() {
+    document.getElementsByTagName("html")[0].style.cssText = 'overflow:visible;';
+    document.getElementById('landing').style.cssText = 'display:none;';
+    term = "food";
+	sendSuggestion();
+}
+
+function displayLocation(latitude, longitude) {
+    var request = new XMLHttpRequest();
+
+    var method = 'GET';
+    var url = 'http://maps.googleapis.com/maps/api/geocode/json?latlng=' + latitude + ',' + longitude + '&sensor=true';
+    var async = true;
+
+    request.open(method, url, async);
+    request.onreadystatechange = function() {
+        if (request.readyState == 4 && request.status == 200) {
+            var data = JSON.parse(request.responseText);
+            var address = data.results[0];
+            city = address.address_components[3].long_name;
+            state = address.address_components[5].short_name;
+            add = address.formatted_address;
+            document.getElementById('inputloc').value = add;
+			term = "food";
+			sendSuggestion();
+        }
+    };
+    request.send();
+};
+
+var successCallback = function(position) {
+    var x = position.coords.latitude;
+    var y = position.coords.longitude;
+    displayLocation(x, y);
+};
+
+var errorCallback = function(error) {
+    var errorMessage = 'Unknown error';
+    switch (error.code) {
+        case 1:
+            errorMessage = 'Permission denied';
+            break;
+        case 2:
+            errorMessage = 'Position unavailable';
+            break;
+        case 3:
+            errorMessage = 'Timeout';
+            break;
+    }
+    //document.write(errorMessage);
+};
+
+var options = {
+    enableHighAccuracy: true,
+    timeout: 1000,
+    maximumAge: 0
+};
+
+navigator.geolocation.getCurrentPosition(successCallback, errorCallback, options);
+
+
+//setup before functions
+var typingTimerTerm; //timer identifier
+var typingTimerLocation; //timer identifier
+var doneTypingInterval = 200; //time in ms (5 seconds)
+
+$('#inputloc').keydown( function( event ) {
+    if ( event.which === 13 ) {
+		sendSuggestion();
+        event.preventDefault();
+        return false;
+    }
+});
+
+$('#terminput').keydown( function( event ) {
+    if ( event.which === 13 ) {
+		sendSuggestion();
+        event.preventDefault();
+        return false;
+    }
+});
+
+/*
+//These are dynamic typing searches but they bombard the API, and makes it timeout :)
+//on keyup, start the countdown
+$('#terminput').keyup(function() {
+    clearTimeout(typingTimerTerm);
+    if ($('#terminput').val()) {
+        typingTimerTerm = setTimeout(doneTypingTerm, doneTypingInterval);
+    }
+});
+
+//on keyup, start the countdown
+$('#inputloc').keyup(function() {
+    clearTimeout(typingTimerLocation);
+    if ($('#inputloc').val()) {
+        typingTimerLocation = setTimeout(doneTypingLocation, doneTypingInterval);
+    }
+});
+
+//user is "finished typing," do something
+function doneTypingTerm() {
+    sendSuggestion();
+}
+
+function doneTypingLocation() {
+    sendSuggestion();
+}
+
+*/
+
+window.onscroll = function(ev) {
+    if ((window.innerHeight + window.scrollY) >= (document.body.scrollHeight)) {
+	//We dont want to call this more than once
+	if(moreResults){
+		setTimeout(function(){
+		document.getElementById("main").innerHTML += '<div class="misc" style="text-align:center;font-weight:bold;"><h2>Loading more results...</h2></div>';
+        scroll();
+		},2000);
+		}
+	}
+};
+
+
+function scroll() {
+isLoading(true);
+    offset += number;
+    var p = document.getElementById("Price");
+    price = p.options[p.selectedIndex].value;
+
+    var s = document.getElementById("Sort");
+    sort = s.options[s.selectedIndex].value;
+
+    var d = document.getElementById("Distance");
+    distance = d.options[d.selectedIndex].value;
+
+    var o = document.getElementById("open");
+    open = o.options[o.selectedIndex].value;
+
+    if(document.getElementById('terminput').value != ""){
+		term = document.getElementById('terminput').value;
+	}
+    var place = document.getElementById('inputloc').value;
+
+    console.log(price);
+    console.log(sort);
+    console.log(distance);
+    console.log(open);
+    console.log(term);
+    if (typeof city == "undefined" || typeof state == "undefined") {
+        add = document.getElementById('inputloc').value;
+    } else if (place != (city + ', ' + state)) {
+        add = place;
+    }
+
+    var xmlhttp = new XMLHttpRequest();
+    xmlhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+			$('.misc').remove()
+			isLoading(false);
+            document.getElementById("main").innerHTML += (this.responseText);
+			if(this.responseText.includes("No more results")){
+				moreResults = false;
+			}
+        }
+    };
+	
+
+    if (add != "") {
+        xmlhttp.open("GET", "http://andrewh.xyz/y/backend.php?address=" + add + "&term=" + term + "&num=" + number +
+            "&offset=" + offset + "&price=" + price + "&sort=" + sort + "&distance=" + distance + "&open=" + open, true);
+        xmlhttp.send();
+    }
+}
+
+/*
+$("#landingterm").keyup(function(event){
+    if(event.keyCode == 13){
+        term = document.getElementById('landingterm').value;
+		document.getElementById('terminput').value = term;
+		sendSuggestion();
+		css();
+    }
+});
+*/
+$('#landingterm').keydown( function( event ) {
+    if ( event.which === 13 ) {
+        term = document.getElementById('landingterm').value;
+		document.getElementById('terminput').value = term;
+		sendSuggestion();
+		css();
+        event.preventDefault();
+        return false;
+    }
+});
+
+function sendSuggestion() {
+isLoading(true);
+    number = 30; //default of 10 options show
+    offset = number;
+    var p = document.getElementById("Price");
+    price = p.options[p.selectedIndex].value;
+
+    var s = document.getElementById("Sort");
+    sort = s.options[s.selectedIndex].value;
+
+    var d = document.getElementById("Distance");
+    distance = d.options[d.selectedIndex].value;
+
+    var o = document.getElementById("open");
+    open = o.options[o.selectedIndex].value;
+
+    term = document.getElementById('terminput').value;
+    var place = document.getElementById('inputloc').value;
+
+    console.log(price);
+    console.log(sort);
+    console.log(distance);
+    console.log(open);
+    console.log(term);
+	
+    if (typeof city == "undefined" || typeof state == "undefined") {
+        add = document.getElementById('inputloc').value;
+    } else if (place != (city + ', ' + state)) {
+        add = place;
+    }
+
+    var xmlhttp = new XMLHttpRequest();
+    xmlhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+			moreResults = true;
+			isLoading(false);
+            document.getElementById("main").innerHTML = (this.responseText);
+        }
+    };
+
+    if (add != "") {
+        xmlhttp.open("GET", "http://andrewh.xyz/y/backend.php?address=" + add + "&term=" + term + "&num=" + number +
+            "&offset=" + offset + "&price=" + price + "&sort=" + sort + "&distance=" + distance + "&open=" + open, true);
+        xmlhttp.send();
+    }
+	
+}
+
+	function isLoading(loading){
+		if(loading){
+			document.getElementById('loading').style.cssText = "display:normal;margin: 0 auto;width: 100%;text-align: center;padding: 0 0.2em 0 0.2em;font-weight: bold;font-size: 1.5em;padding-top: 0.2em;padding-bottom: 0.2em;background: #2F4F4F;";
+		}else{
+			document.getElementById('loading').style.cssText = 'display: none;';
+		}
+	}
+	
+var int = setInterval(function() {
+    if ((document.getElementById('loadingtext').innerHTML += '.').length == 15) {
+        document.getElementById('loadingtext').innerHTML = 'Loading..';
+		//clearInterval( int );
+	}
+}, 200);
+
+</script>
+</html>
+
